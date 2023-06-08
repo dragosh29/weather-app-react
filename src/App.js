@@ -1,21 +1,25 @@
 import './App.css';
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import Weather from './components/weather';
+import SearchPage from './components/SearchPage';
 import { Dimmer, Loader } from 'semantic-ui-react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 
 export default function App() {
-    const [lat, setLat] = useState([]);
-    const [long, setLong] = useState([]);
-    const [data, setData] = useState([]);
+    const [lat, setLat] = useState(null);
+    const [long, setLong] = useState(null);
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchData = async () => {
-            const getPosition = () =>
-                new Promise((resolve, reject) =>
-                    navigator.geolocation.getCurrentPosition(resolve, reject)
-                );
-
             try {
+                const getPosition = () =>
+                    new Promise((resolve, reject) =>
+                        navigator.geolocation.getCurrentPosition(resolve, reject)
+                    );
+
                 const position = await getPosition();
                 const latitude = position.coords.latitude;
                 const longitude = position.coords.longitude;
@@ -23,29 +27,70 @@ export default function App() {
                 setLat(latitude);
                 setLong(longitude);
 
-                const response = await fetch(`${process.env.REACT_APP_API_URL}?lat=${latitude}&lon=${longitude}&units=metric&APPID=${process.env.REACT_APP_API_KEY}`);
+                const response = await fetch(
+                    `${process.env.REACT_APP_API_URL}?lat=${latitude}&lon=${longitude}&units=metric&APPID=${process.env.REACT_APP_API_KEY}`
+                );
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch weather data.');
+                }
+
                 const result = await response.json();
                 setData(result);
-                console.log(result);
+                setLoading(false);
             } catch (error) {
-                console.error(error);
+                setError(error);
+                setLoading(false);
             }
         };
 
         fetchData();
     }, []);
 
+    if (loading) {
+        return (
+            <div className="App">
+                <Dimmer active>
+                    <Loader>Loading..</Loader>
+                </Dimmer>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="App">
+                <h2>Error: {error.message}</h2>
+            </div>
+        );
+    }
+
     return (
-        <div className="App">
-            {typeof data.main !== 'undefined' ? (
-                <Weather weatherData={data} />
-            ) : (
-                <div>
-                    <Dimmer active>
-                        <Loader>Loading..</Loader>
-                    </Dimmer>
+        <Router>
+            <div className="App">
+                <div className="nav">
+                    <Link to="/" className="home">Home</Link>
+                    <Link to="/search">Search</Link>
                 </div>
-            )}
-        </div>
+
+                <Routes>
+                    <Route
+                        path="/"
+                        element={
+                            <Weather
+                                weatherData={data}
+                                lat={lat}
+                                long={long}
+                                isCurrentLocation={true}
+                            />
+                        }
+                    />
+                    <Route
+                        path="/search"
+                        element={<SearchPage lat={lat} long={long} />}
+                    />
+                </Routes>
+            </div>
+        </Router>
     );
 }
